@@ -142,6 +142,6 @@ func (this *Ygo) genPidFile() {
 }
 
 //删除pid文件
-func (y *Ygo) removePidFile() {
+func (this *Ygo) removePidFile() {
 	os.Remove(lib.Conf.Get("app_pid_file"))
 }
