@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/json-iterator/go"
 )
 
 func Interceptor(guard bool, errmsg *Error, fmts ...interface{}) {
@@ -40,6 +41,7 @@ func GetLocalIp() string { // {{{
 } // }}}
 
 func JsonEncode(data interface{}) string { // {{{
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	content, err := json.MarshalIndent(data, "", "")
 	if err != nil {
 		return ""
@@ -49,6 +51,7 @@ func JsonEncode(data interface{}) string { // {{{
 } // }}}
 
 func JsonDecode(data string) interface{} { // {{{
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	var obj interface{}
 	err := json.Unmarshal([]byte(data), &obj)
 	if err != nil {
