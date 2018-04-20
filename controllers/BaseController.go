@@ -6,7 +6,6 @@ import (
 	"github.com/mlaoji/ygo/lib"
 	"html/template"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,8 +47,6 @@ type BaseController struct {
 	mode       int
 	rpcContent string
 	uri        string
-	Controller string
-	Action     string
 	Debug      bool
 }
 
@@ -59,12 +56,13 @@ func (this *BaseController) Prepare(rw http.ResponseWriter, r *http.Request, req
 
 	this.RBody, _ = this.getRequestBody(r)
 
-	r.ParseMultipartForm(32 << 20) //32M
+	r.ParseForm()
 
 	this.prepare(r.Form, HTTP_MODE, requestUri)
 
-	//校验token是否有效
-	//优先使用cookie中的token 和 userid, 不存在则取Form参数
+	//token保存在cookie中
+	//校验token是否有效，同时与参数中的userid一致
+	//优先取cookie中的userid, 不存在则使用url参数
 
 	userId := this.GetInt("userid")
 	ck_userId := this.GetCookie("userid")
@@ -82,11 +80,7 @@ func (this *BaseController) Prepare(rw http.ResponseWriter, r *http.Request, req
 		token_key = "token"
 	}
 
-	token := this.GetString(token_key)
-	ck_token := this.GetCookie(token_key)
-	if len(ck_token) > 0 {
-		token = ck_token
-	}
+	token := this.GetCookie(token_key)
 
 	if len(token_secret) > 0 {
 		lib.TokenSecret = token_secret
@@ -98,7 +92,7 @@ func (this *BaseController) Prepare(rw http.ResponseWriter, r *http.Request, req
 		this.UserId = userId
 	}
 
-	uri := this.uri
+	uri := strings.ToLower(this.uri)
 	//需要校验token的接口在配置中定义
 	if auth_conf["check_token"] == "1" && -1 == strings.Index(uri, "monitor/") { //默认关闭
 		api_need_check_token_except := auth_conf["token_api_except"]
@@ -113,9 +107,6 @@ func (this *BaseController) Prepare(rw http.ResponseWriter, r *http.Request, req
 					}
 
 					access_redirect += "http_referer=" + url.QueryEscape(this.GetHeader("Referer"))
-					access_redirect += "&request_controller=" + this.Controller
-					access_redirect += "&request_action=" + this.Action
-					access_redirect += "&request_uri=" + url.QueryEscape(this.R.URL.String())
 					this.Redirect(access_redirect) //如果设置跳转URL，则直接跳转
 				}
 
@@ -160,7 +151,7 @@ func (this *BaseController) Prepare(rw http.ResponseWriter, r *http.Request, req
 
 	freq_conf := lib.Conf.GetAll("api_freq_conf")
 	if freq_conf["check_freq"] == "1" { //默认关闭
-		mtd := this.uri
+		mtd := strings.ToLower(requestUri)
 		mtd_cnf := lib.Conf.GetSlice(mtd, ",", "api_freq_conf")
 		for _, freq_rule := range mtd_cnf {
 			whitelist := lib.Conf.GetSlice(freq_rule+"_whitelist", ",", "api_freq_conf")
@@ -219,10 +210,7 @@ func (this *BaseController) prepare(r url.Values, mode int, requestUri string) {
 	this.Debug = DEBUG_OPEN
 	this.IR = &iRequest{r}
 	this.mode = mode
-	this.uri = strings.ToLower(requestUri)
-	uris := strings.Split(this.uri, "/")
-	this.Controller = uris[0]
-	this.Action = uris[1]
+	this.uri = requestUri
 } // }}}
 
 //以下 GetX 方法用于获取参数
@@ -366,15 +354,11 @@ func (this *BaseController) GetFromJson(key string) interface{} { // {{{
 	return ret
 } // }}}
 
-func (this *BaseController) GetFile(key string) (multipart.File, *multipart.FileHeader, error) { // {{{
-	return this.R.FormFile(key)
-} // }}}
-
 func (this *BaseController) GetIp() string { // {{{
 	r := this.R
 
 	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" || ip == "127.0.0.1" {
+	if ip == "" {
 		ip = r.Header.Get("X-Real-IP")
 		if ip == "" {
 			ip = r.Header.Get("Host")
@@ -470,11 +454,6 @@ func (this *BaseController) RenderError(err interface{}, data ...interface{}) { 
 	case *lib.Error:
 		errno = errinfo.GetCode()
 		errmsg = errinfo.GetMessage()
-		isbizerr = true
-	case *lib.Errorf:
-		lang := this.GetString("lang")
-		errno = errinfo.GetCode()
-		errmsg = errinfo.GetMessage(lang)
 		isbizerr = true
 	case error:
 		errno = lib.ERR_SYSTEM.GetCode()

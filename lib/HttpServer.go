@@ -78,8 +78,6 @@ func (this *httpHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			switch errinfo := err.(type) {
 			case *Error:
 				errmsg = errinfo.GetMessage()
-			case *Errorf:
-				errmsg = errinfo.GetMessage()
 			case error:
 				errmsg = errinfo.Error()
 				log.Println(errmsg)
@@ -97,11 +95,9 @@ func (this *httpHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if ref := r.Referer(); ref != "" {
 		if u, err := url.Parse(ref); nil == err {
 			cors_domain := Conf.Get("cors_domain")
-			if len(cors_domain) > 0 {
-				if "*" == cors_domain || strings.Contains(","+cors_domain+",", ","+u.Host+",") {
-					rw.Header().Set("Access-Control-Allow-Origin", u.Scheme+"://"+u.Host)
-					rw.Header().Set("Access-Control-Allow-Credentials", "true")
-				}
+			if len(cors_domain) > 0 && strings.Contains(","+cors_domain+",", ","+u.Host+",") {
+				rw.Header().Set("Access-Control-Allow-Origin", u.Scheme+"://"+u.Host)
+				rw.Header().Set("Access-Control-Allow-Credentials", "true")
 			}
 		}
 	}
