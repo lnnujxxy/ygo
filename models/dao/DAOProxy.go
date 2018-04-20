@@ -17,6 +17,7 @@ type DAOProxy struct {
 	primary            string
 	fields             string //字段,逗号分隔
 	bind               interface{}
+	countField         string //count字段
 }
 
 func (this *DAOProxy) Init(conf ...string) { //{{{
@@ -64,6 +65,10 @@ func (this *DAOProxy) SetPrimary(field string) {
 
 func (this *DAOProxy) GetPrimary() string {
 	return this.primary
+}
+
+func (this *DAOProxy) SetCountField(field string) {
+	this.countField = field
 }
 
 func (this *DAOProxy) SetFields(fields string) {
@@ -259,6 +264,10 @@ func (this *DAOProxy) preParams(obj interface{}) map[string]interface{} {
 	return data
 } // }}}
 
+func (this *DAOProxy) Execute(sql string, params ...interface{}) int { //{{{
+	return this.DBWriter.Execute(sql, params...)
+} // }}}
+
 //AddRecord、SetRecord、ResetRecord 支持传入map[string]interface{} 和 struct 两种类型参数
 //AddRecord {{{
 func (this *DAOProxy) AddRecord(vals interface{}) int {
@@ -306,13 +315,25 @@ func (this *DAOProxy) DelRecordBy(where string, params ...interface{}) int {
 	return this.DBWriter.Execute("delete from "+this.table+" where "+where+" limit 1", params...)
 } // }}}
 
-//GetCount {{{
-func (this *DAOProxy) GetCount(where string, params ...interface{}) int {
+func (this *DAOProxy) GetOne(field, where string, params ...interface{}) interface{} { //{{{
 	if "" == where {
 		where = "1"
 	}
 
-	total, _ := strconv.Atoi(this.DBReader.GetOne("select count("+this.primary+") as total from "+this.table+" where "+where, params...).(string))
+	return this.DBReader.GetOne("select "+field+" from "+this.table+" where "+where, params...)
+} // }}}
+
+//GetCount {{{
+func (this *DAOProxy) GetCount(where string, params ...interface{}) int {
+	if "" == this.countField {
+		this.countField = this.primary
+	}
+
+	if "" == where {
+		where = "1"
+	}
+
+	total, _ := strconv.Atoi(this.DBReader.GetOne("select count("+this.countField+") as total from "+this.table+" where "+where, params...).(string))
 
 	return total
 } // }}}
